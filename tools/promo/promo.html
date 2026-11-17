@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>promo</title>
+<style>body{margin:0;background:#111}canvas{display:block}</style></head>
+<body><canvas id="c"></canvas>
+<script type="module">
+import { drawScene, drawTitle, PRESETS } from './promo.js';
+const { THEMES, buildModel } = PRESETS;
+const q = new URLSearchParams(location.search);
+const kind = q.get('kind'), lang = q.get('lang') || 'ru';
+const TXT = { ru: { title: 'Тени', tag: 'Поверни предмет — поймай тень' }, en: { title: 'Shadows', tag: 'Turn the object, catch the shadow' } }[lang];
+const house = buildModel(['house']);
+const HOUSE = { ry: -45.75, rx: -28.03, rz: 0 };
+const OFF = { ry: -38, rx: -21, rz: 0 };
+const c = document.getElementById('c'), ctx = c.getContext('2d');
+const size = { icon: [512, 512], cover: [800, 470], showcase: [1560, 520] }[kind];
+c.width = size[0]; c.height = size[1];
+const [W, H] = size;
+if (kind === 'icon') {
+  drawScene(ctx, W, H, { theme: THEMES[0], model: house, rot: HOUSE, target: HOUSE, outline: true, glow: 0.12,
+    wall: { x: 266, y: 214, s: 96 }, lightR: 330, tableY: 410, obj: { x: 0, y: 0, s: 1 }, showObject: false,
+    candle: { x: 104, y: 498, k: 1.7 }, vignette: 0.55, dust: 26, seed: 3 });
+} else if (kind === 'cover') {
+  drawScene(ctx, W, H, { theme: THEMES[0], model: house, rot: OFF, target: HOUSE, outline: true, glow: 0,
+    wall: { x: 575, y: 158, s: 62 }, lightR: 330, tableY: 300, obj: { x: 585, y: 392, s: 40 },
+    candle: { x: 410, y: 458, k: 1.25 }, vx: 0.7, vignette: 0.7, dust: 34, seed: 5 });
+  drawTitle(ctx, { title: TXT.title, tag: TXT.tag, x: 46, y: lang === 'ru' ? 205 : 195, size: lang === 'ru' ? 104 : 84 });
+} else if (kind === 'showcase') {
+  drawScene(ctx, W, H, { theme: THEMES[0], model: house, rot: HOUSE, target: HOUSE, outline: true, glow: 0.5,
+    wall: { x: 1060, y: 180, s: 74 }, lightR: 520, tableY: 360, obj: { x: 1105, y: 452, s: 38 },
+    candle: { x: 840, y: 505, k: 1.45 }, vx: 0.68, vignette: 0.68, dust: 60, seed: 9 });
+  drawTitle(ctx, { title: TXT.title, tag: TXT.tag, x: 130, y: 260, size: lang === 'ru' ? 150 : 120 });
+}
+window.__done = c.toDataURL('image/png');
+</script></body></html>
