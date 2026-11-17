@@ -1,0 +1,41 @@
+{
+ "fps": 30,
+ "scenes": [
+  {
+   "level": 2,
+   "start": 0,
+   "win": 81,
+   "end": 113,
+   "roll": false
+  },
+  {
+   "level": 4,
+   "start": 113,
+   "win": 188,
+   "end": 260,
+   "roll": false
+  },
+  {
+   "level": 19,
+   "start": 260,
+   "win": 348,
+   "end": 380,
+   "roll": true
+  },
+  {
+   "level": 34,
+   "start": 380,
+   "win": 460,
+   "end": 492,
+   "roll": true
+  },
+  {
+   "level": 51,
+   "start": 492,
+   "win": 577,
+   "end": 619,
+   "roll": true
+  }
+ ],
+ "frames": 619
+}
