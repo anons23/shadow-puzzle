@@ -22,6 +22,7 @@ export const Platform = {
       } catch (e) { ysdk = null; }
     } else if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
       this.name = 'android';
+      NativeAds.init();
     }
     return lang;
   },

@@ -6,3 +6,5 @@ android/
 local.properties
 dist/
 tools/video/out/
+keystore.properties
+keys/

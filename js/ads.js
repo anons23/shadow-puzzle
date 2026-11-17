@@ -1,3 +1,7 @@
+import { AD_UNITS } from './config.js';
+
+// Android: native plugin GameAds (android-src/GameAdsPlugin.java, Yandex Mobile Ads SDK).
+// Browser: a 2-second stub so the game flow can be tested without real ads.
 function overlay(text, seconds) {
   return new Promise((resolve) => {
     const el = document.createElement('div');
@@ -15,12 +19,17 @@ function overlay(text, seconds) {
   });
 }
 
+let native = null, configured = false;
 function plugin() {
   const c = window.Capacitor;
-  return c && c.Plugins && c.Plugins.OneTouchAds ? c.Plugins.OneTouchAds : null;
+  if (!c || !c.isNativePlatform || !c.isNativePlatform()) return null;
+  if (!native) native = (c.Plugins && c.Plugins.GameAds) || (c.registerPlugin ? c.registerPlugin('GameAds') : null);
+  if (native && !configured) { configured = true; native.configure(AD_UNITS).catch(() => { configured = false; }); }
+  return native;
 }
 
 export const Ads = {
+  init() { plugin(); },
   async showRewarded() {
     const p = plugin();
     if (p) { try { return !!(await p.showRewarded()).rewarded; } catch (e) { return false; } }
@@ -28,7 +37,7 @@ export const Ads = {
   },
   async showInterstitial() {
     const p = plugin();
-    if (p) { try { await p.showInterstitial(); } catch (e) {} return true; }
+    if (p) { try { return !!(await p.showInterstitial()).shown; } catch (e) { return false; } }
     return overlay('Продолжим через', 2);
   },
 };

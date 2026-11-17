@@ -73,13 +73,18 @@ node tools/check-levels.mjs          # проверка: решаемость, �
 ```
 
 ## Сборка APK
+Проще всего — `build-apk.bat` (Windows): скачивает репозиторий в `D:\shadow-build`, ставит зависимости, создаёт Android-проект, при первом запуске делает ключ подписи (спросит пароль), собирает подписанный APK и кладёт его рядом с собой вместе с `build-log.txt` и копией ключа.
+
+Вручную:
 ```
 npm install
 npx cap add android              # один раз
-npm run sync-release             # игра в www с закрытыми уровнями + sync + портрет и версия
+npm run sync-release             # игра с закрытыми уровнями + портрет, версия, реклама, иконки, подпись
 cd android && gradlew assembleRelease
 ```
-- `npm run sync` — то же, но уровни открыты (для теста на телефоне).
-- `scripts/patch-android.mjs` закрепляет вертикальную ориентацию и берёт версию из `package.json` (1.2.3 → versionCode 10203). Перед каждым обновлением в RuStore поднимай `version`.
-- Ключ подписи (.jks) в репозиторий и в www не кладём.
+- `android-src/` — наш Android-код: `GameAdsPlugin.java` (Yandex Mobile Ads: межстраничная и с вознаграждением), иконки всех размеров, заставка.
+- `scripts/setup-android.mjs` встраивает это в проект Capacitor и подключает подпись из `keystore.properties` (лежит вне git).
+- `scripts/patch-android.mjs` — вертикальная ориентация и версия из `package.json` (1.2.3 → versionCode 10203). Перед каждым обновлением поднимай `version`.
+- ID рекламных блоков — `js/config.js` (`AD_UNITS`).
+- Ключ подписи (.jks) и пароль в репозиторий не кладём. Потеря ключа = нельзя выпускать обновления.
 - Тексты карточки: `store/rustore/description.md`.
