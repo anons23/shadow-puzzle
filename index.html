@@ -14,6 +14,7 @@
     <h1 class="logo" data-i18n="title">Тени</h1>
     <p class="tag" data-i18n="tag">Поверни предмет, пока тень не совпадёт.</p>
     <button id="btn-play" class="btn big" data-i18n="play">Играть</button>
+    <button id="btn-daily" class="btn daily"><span data-i18n="daily">Уровень дня</span><small id="daily-sub"></small></button>
     <button id="btn-levels" class="btn" data-i18n="levels">Уровни</button>
     <button id="btn-sound" class="btn ghost">Звук: вкл</button>
     <button id="btn-music" class="btn ghost">Музыка: вкл</button>
@@ -44,7 +45,7 @@
 
   <div id="win" class="modal hidden">
     <div class="card">
-      <h2 data-i18n="matched">Тень совпала</h2>
+      <h2 id="win-title" data-i18n="matched">Тень совпала</h2>
       <p class="stars" id="win-stars"></p>
       <p id="win-info"></p>
       <button id="win-next" class="btn big">Дальше</button>

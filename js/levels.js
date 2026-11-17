@@ -1,5 +1,6 @@
 import { buildModel, TEMPLATES, rasterize, shadowPolys } from './engine.js';
 import { LEVELS } from './levels-data.js';
+import { DAILY } from './daily-data.js';
 
 export const LEVEL_COUNT = LEVELS.length;
 export const METER_LEVELS = 7;
@@ -13,6 +14,25 @@ export const THEMES = [
 ];
 
 const cache = new Map();
+
+export function todayKey(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+export function dayNumber(d = new Date()) { return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000); }
+
+export function getDaily(dn) {
+  const idx = ((dn % DAILY.length) + DAILY.length) % DAILY.length, key = 'daily' + idx;
+  if (cache.has(key)) return cache.get(key);
+  const d = DAILY[idx], model = buildModel(d.keys);
+  const secret = { ry: d.ry, rx: d.rx, rz: d.rz };
+  const L = {
+    index: -1, daily: true, dayIdx: idx, model, secret, thr: d.thr, keys: d.keys,
+    grid: rasterize(shadowPolys(model, secret.ry, secret.rx, secret.rz)),
+    theme: ((dn % THEMES.length) + THEMES.length) % THEMES.length, hasRoll: true, meter: false,
+  };
+  cache.set(key, L);
+  return L;
+}
 
 export function getLevel(index) {
   if (cache.has(index)) return cache.get(index);

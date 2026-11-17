@@ -1,5 +1,6 @@
 import { rotateFaces, shadowPolys, rasterize, iou } from './engine.js';
-import { getLevel, LEVEL_COUNT, THEMES, METER_LEVELS, ROLL_FROM } from './levels.js';
+import { getLevel, getDaily, dayNumber, todayKey, LEVEL_COUNT, THEMES, METER_LEVELS, ROLL_FROM } from './levels.js';
+import { Analytics } from './analytics.js';
 import { Platform } from './platform.js';
 import { t, setLang, applyStatic } from './i18n.js';
 import { Sound } from './audio.js';
@@ -12,8 +13,8 @@ const $ = (id) => document.getElementById(id);
 // TODO перед релизом: поставить TEST_UNLOCK_ALL = false
 const TEST_UNLOCK_ALL = false;
 const UNLOCK_ALL = TEST_UNLOCK_ALL || /[?&]unlock=1/.test(location.search);
-const DEFAULTS = { stars: [], sound: true, music: true };
-let save = Object.assign({}, DEFAULTS);
+const makeDefaults = () => ({ stars: [], sound: true, music: true, freeHints: 0, daily: { last: '', streak: 0, best: 0 } });
+let save = makeDefaults();
 function persist() { Platform.writeSave(save); }
 function levelName(L) { return L.keys.map((k) => t('obj.' + k)).join(' + '); }
 
@@ -22,7 +23,7 @@ function buzz(ms) { try { if (save.sound && navigator.vibrate) navigator.vibrate
 function show(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
   Sound.setScene(id === 'screen-game');
-  if (id !== 'screen-game') Platform.gameplay(false);
+  if (id !== 'screen-game') { Platform.gameplay(false); clearTimeout(winTimer); $('win').classList.add('hidden'); }
 }
 
 function hex(c) { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -83,23 +84,48 @@ function seedDust() {
   for (let i = 0; i < 26; i++) dust.push({ x: 20 + Math.random() * 320, y: 30 + Math.random() * 480, vx: (Math.random() - 0.5) * 0.06, vy: -0.03 - Math.random() * 0.08, r: 0.7 + Math.random() * 1.1, ph: Math.random() * 6.28 });
 }
 
-function startLevel(i) {
+function yesterdayKey() { const d = new Date(); d.setDate(d.getDate() - 1); return todayKey(d); }
+function maxReached() { let m = 0; save.stars.forEach((s, i) => { if (s > 0) m = i + 1; }); return m; }
+function hintLabel() { $('btn-hint').textContent = save.freeHints > 0 ? t('hintFree', { n: save.freeHints }) : t('hint'); }
+
+function startDaily() {
   clearTimeout(winTimer);
-  level = getLevel(i);
+  level = getDaily(dayNumber());
   level.tcv = null;
+  setupLevel();
+  $('hud-level').textContent = t('daily');
+  setStatus(t('dailyGoal', { name: levelName(level) }));
+  Analytics.event('daily_start', { day: level.dayIdx });
+  enterGame();
+}
+
+function setupLevel() {
   applyTheme(THEMES[level.theme]);
   Sound.setRoom(level.theme);
   ry = 0; rx = 0; rz = 0; ghost = false; hintUsed = false; moves = 0; locked = false; t0 = Date.now(); winAt = 0; sparks = [];
   $('roll').value = 0;
   $('roll-row').classList.toggle('hidden', !level.hasRoll);
-  $('hud-level').textContent = t('level', { n: i + 1, m: LEVEL_COUNT });
   $('win').classList.add('hidden');
+  hintLabel();
+}
+
+function enterGame() {
+  show('screen-game'); resize(); seedDust(); recompute(); draw();
+  Platform.gameplay(true);
+}
+
+function startLevel(i) {
+  clearTimeout(winTimer);
+  level = getLevel(i);
+  level.tcv = null;
+  setupLevel();
+  $('hud-level').textContent = t('level', { n: i + 1, m: LEVEL_COUNT });
+  Analytics.event('level_start', { level: i + 1 });
   if (i === METER_LEVELS) setStatus(t('noMeter'));
   else if (i === ROLL_FROM) setStatus(t('newTilt'));
   else if (i % 15 === 0 && i > 0) setStatus(t('newRoom', { name: t('room.' + level.theme) }));
   else setStatus(t('goal', { name: levelName(level) }));
-  show('screen-game'); resize(); seedDust(); recompute(); draw();
-  Platform.gameplay(true);
+  enterGame();
 }
 
 function buildBg() {
@@ -306,21 +332,45 @@ function check() {
   }
   buzz([20, 40, 30]);
   const secs = (Date.now() - t0) / 1000;
+  if (level.daily) winDaily(secs); else winLevel(secs);
+  persist(); finished++;
+  Sound.win();
+  Platform.gameplay(false);
+  Analytics.progress(maxReached(), save.daily.streak);
+  const lvl = level;
+  winTimer = setTimeout(async () => {
+    if (finished % 3 === 0 && await withAd(() => Platform.showInterstitial())) Analytics.event('ad_interstitial');
+    if (level === lvl && locked) $('win').classList.remove('hidden');
+  }, 1100);
+}
+
+function winLevel(secs) {
   const fast = level.index < 20 ? 45 : level.index < 40 ? 75 : 100;
   const stars = hintUsed ? 1 : secs < fast ? 3 : 2;
   const i = level.index;
-  save.stars[i] = Math.max(save.stars[i] || 0, stars); persist(); finished++;
-  Sound.win();
-  Platform.gameplay(false);
+  save.stars[i] = Math.max(save.stars[i] || 0, stars);
+  $('win-title').textContent = t('matched');
   $('win-stars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
   $('win-info').textContent = t('time', { s: Math.round(secs) });
   $('win-next').textContent = i + 1 < LEVEL_COUNT ? t('next') : t('toLevels');
   setStatus(t('matched'));
-  const lvl = level;
-  winTimer = setTimeout(async () => {
-    if (finished % 3 === 0) await withAd(() => Platform.showInterstitial());
-    if (level === lvl && locked) $('win').classList.remove('hidden');
-  }, 1100);
+  Analytics.event('level_win', { level: i + 1, sec: Math.round(secs), hint: hintUsed, stars });
+}
+
+function winDaily(secs) {
+  const d = save.daily, today = todayKey(), first = d.last !== today;
+  if (first) {
+    d.streak = d.last === yesterdayKey() ? d.streak + 1 : 1;
+    d.best = Math.max(d.best || 0, d.streak);
+    d.last = today;
+    save.freeHints = Math.min(5, (save.freeHints || 0) + 1);
+  }
+  $('win-title').textContent = t('dailyDone');
+  $('win-stars').textContent = t('streak', { n: d.streak });
+  $('win-info').textContent = (first ? t('dailyReward') : t('dailyAgain')) + ' · ' + t('time', { s: Math.round(secs) });
+  $('win-next').textContent = t('toMenu');
+  setStatus(t('dailyDone'));
+  if (first) Analytics.event('daily_win', { day: level.dayIdx, streak: d.streak, sec: Math.round(secs), hint: hintUsed });
 }
 
 async function withAd(fn) {
@@ -334,15 +384,22 @@ async function withAd(fn) {
 }
 
 $('win-next').onclick = () => {
+  if (level.daily) { goMenu(); return; }
   const i = level.index;
   if (i + 1 < LEVEL_COUNT) startLevel(i + 1); else openLevels();
 };
-$('win-retry').onclick = () => startLevel(level.index);
+$('win-retry').onclick = () => (level.daily ? startDaily() : startLevel(level.index));
 
 $('btn-hint').onclick = async () => {
   if (locked || ghost) return;
-  const ok = await withAd(() => Platform.showRewarded());
-  if (!ok) { setStatus(t('noReward')); return; }
+  const free = save.freeHints > 0;
+  if (free) { save.freeHints--; persist(); hintLabel(); }
+  else {
+    const ok = await withAd(() => Platform.showRewarded());
+    if (!ok) { setStatus(t('noReward')); return; }
+    Analytics.event('ad_rewarded');
+  }
+  Analytics.event('hint', { level: level.daily ? 'daily' : level.index + 1, free });
   hintUsed = true; ghost = true; Sound.hint();
   setStatus(t('hintOn'));
   draw();
@@ -366,8 +423,18 @@ function firstOpen() { for (let i = 0; i < LEVEL_COUNT; i++) if (!(save.stars[i]
 
 $('btn-play').onclick = () => startLevel(firstOpen());
 $('btn-levels').onclick = openLevels;
-$('levels-back').onclick = () => { applyTheme(THEMES[0]); show('screen-menu'); };
-$('game-back').onclick = () => { applyTheme(THEMES[0]); show('screen-menu'); };
+$('btn-daily').onclick = startDaily;
+function renderDaily() {
+  const d = save.daily, done = d.last === todayKey(), alive = d.last === yesterdayKey() && d.streak > 0;
+  $('daily-sub').textContent = done ? t('dailyDoneSub', { n: d.streak }) : alive ? t('dailyKeep', { n: d.streak }) : t('dailyNew');
+  $('btn-daily').classList.toggle('fresh', !done);
+}
+function goMenu() { applyTheme(THEMES[0]); renderDaily(); show('screen-menu'); }
+$('levels-back').onclick = goMenu;
+$('game-back').onclick = () => {
+  if (level && !locked) Analytics.event(level.daily ? 'daily_quit' : 'level_quit', { level: level.daily ? 'daily' : level.index + 1, sec: Math.round((Date.now() - t0) / 1000) });
+  goMenu();
+};
 function soundLabel() { $('btn-sound').textContent = t('sound') + ': ' + t(save.sound ? 'on' : 'off'); }
 function musicLabel() { $('btn-music').textContent = t('music') + ': ' + t(save.music ? 'on' : 'off'); }
 $('btn-sound').onclick = () => { save.sound = !save.sound; persist(); soundLabel(); Sound.setSfx(save.sound); };
@@ -397,11 +464,19 @@ async function boot() {
   const lang = await Platform.init();
   setLang(lang);
   applyStatic();
-  save = await Platform.loadSave(DEFAULTS);
+  save = await Platform.loadSave(makeDefaults());
+  if (!save.daily || typeof save.daily !== 'object') save.daily = makeDefaults().daily;
+  if (typeof save.freeHints !== 'number') save.freeHints = 0;
   Sound.setSfx(save.sound); Sound.setMusic(save.music);
-  soundLabel(); musicLabel();
+  soundLabel(); musicLabel(); renderDaily();
+  Analytics.init(Platform.name);
+  if (/[?&]stats=1/.test(location.search)) {
+    const el = document.createElement('pre'); el.className = 'stats';
+    el.textContent = JSON.stringify(Analytics.localStats(), null, 1);
+    document.body.appendChild(el);
+  }
   Platform.ready();
 }
 boot();
 
-window.__sh = { Sound, Platform, startLevel, set(a, b, c) { ry = a; rx = b; rz = c || 0; changed(); check(); }, get state() { return { ry, rx, rz, match, locked, level }; } };
+window.__sh = { Sound, Platform, Analytics, startLevel, startDaily, get save() { return save; }, set(a, b, c) { ry = a; rx = b; rz = c || 0; changed(); check(); }, get state() { return { ry, rx, rz, match, locked, level }; } };
