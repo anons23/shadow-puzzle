@@ -7,7 +7,9 @@
     "check": "node tools/check-levels.mjs",
     "serve": "python3 -m http.server 8080",
     "prepare-web": "node scripts/prepare-web.mjs",
-    "sync": "npm run prepare-web && npx cap sync android"
+    "sync": "npm run prepare-web && npx cap sync android && node scripts/patch-android.mjs",
+    "prepare-release": "node scripts/prepare-web.mjs --release",
+    "sync-release": "npm run prepare-release && npx cap sync android && node scripts/patch-android.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.0.0",

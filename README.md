@@ -75,8 +75,11 @@ node tools/check-levels.mjs          # проверка: решаемость, �
 ## Сборка APK
 ```
 npm install
-npm run prepare-web              # копирует в www только игру, без ключей
 npx cap add android              # один раз
-npx cap sync android
+npm run sync-release             # игра в www с закрытыми уровнями + sync + портрет и версия
+cd android && gradlew assembleRelease
 ```
-Ключ подписи (.jks) в репозиторий и в www не кладём.
+- `npm run sync` — то же, но уровни открыты (для теста на телефоне).
+- `scripts/patch-android.mjs` закрепляет вертикальную ориентацию и берёт версию из `package.json` (1.2.3 → versionCode 10203). Перед каждым обновлением в RuStore поднимай `version`.
+- Ключ подписи (.jks) в репозиторий и в www не кладём.
+- Тексты карточки: `store/rustore/description.md`.
