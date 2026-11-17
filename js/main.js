@@ -5,7 +5,9 @@ import { Ads } from './ads.js';
 const W = 360, H = 560, TABLE_Y = 150, WALL_Y = 420, S_TABLE = 50, S_WALL = 56;
 const $ = (id) => document.getElementById(id);
 const KEY = 'shadows.v2';
-const UNLOCK_ALL = /[?&]unlock=1/.test(location.search);
+// TODO перед релизом: поставить TEST_UNLOCK_ALL = false
+const TEST_UNLOCK_ALL = true;
+const UNLOCK_ALL = TEST_UNLOCK_ALL || /[?&]unlock=1/.test(location.search);
 let save = { stars: [], sound: true };
 try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
