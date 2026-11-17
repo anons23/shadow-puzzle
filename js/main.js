@@ -1,6 +1,7 @@
 import { rotateFaces, shadowPolys, rasterize, iou } from './engine.js';
 import { getLevel, LEVEL_COUNT, THEMES, METER_LEVELS, ROLL_FROM } from './levels.js';
-import { Ads } from './ads.js';
+import { Platform } from './platform.js';
+import { t, setLang, applyStatic } from './i18n.js';
 import { Sound } from './audio.js';
 
 const W = 360, H = 560, WALL_H = 330;
@@ -8,19 +9,20 @@ const SX = 180, SY = 182, S_WALL = 50;
 const OX = 200, OY = 440, S_OBJ = 44;
 const CANDLE = { x: 54, y: 548 };
 const $ = (id) => document.getElementById(id);
-const KEY = 'shadows.v2';
 // TODO перед релизом: поставить TEST_UNLOCK_ALL = false
-const TEST_UNLOCK_ALL = true;
+const TEST_UNLOCK_ALL = false;
 const UNLOCK_ALL = TEST_UNLOCK_ALL || /[?&]unlock=1/.test(location.search);
-let save = { stars: [], sound: true, music: true };
-try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
-function persist() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
+const DEFAULTS = { stars: [], sound: true, music: true };
+let save = Object.assign({}, DEFAULTS);
+function persist() { Platform.writeSave(save); }
+function levelName(L) { return L.keys.map((k) => t('obj.' + k)).join(' + '); }
 
 function buzz(ms) { try { if (save.sound && navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
 
 function show(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
   Sound.setScene(id === 'screen-game');
+  if (id !== 'screen-game') Platform.gameplay(false);
 }
 
 function hex(c) { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -90,13 +92,14 @@ function startLevel(i) {
   ry = 0; rx = 0; rz = 0; ghost = false; hintUsed = false; moves = 0; locked = false; t0 = Date.now(); winAt = 0; sparks = [];
   $('roll').value = 0;
   $('roll-row').classList.toggle('hidden', !level.hasRoll);
-  $('hud-level').textContent = 'Уровень ' + (i + 1) + ' из ' + LEVEL_COUNT;
+  $('hud-level').textContent = t('level', { n: i + 1, m: LEVEL_COUNT });
   $('win').classList.add('hidden');
-  if (i === METER_LEVELS) setStatus('Дальше без процентов: подгоняй на глаз');
-  else if (i === ROLL_FROM) setStatus('Новое: ползунок наклона внизу');
-  else if (i % 15 === 0 && i > 0) setStatus('Новая комната: ' + theme.name);
-  else setStatus(level.name + ': подгони тень под контур');
+  if (i === METER_LEVELS) setStatus(t('noMeter'));
+  else if (i === ROLL_FROM) setStatus(t('newTilt'));
+  else if (i % 15 === 0 && i > 0) setStatus(t('newRoom', { name: t('room.' + level.theme) }));
+  else setStatus(t('goal', { name: levelName(level) }));
   show('screen-game'); resize(); seedDust(); recompute(); draw();
+  Platform.gameplay(true);
 }
 
 function buildBg() {
@@ -308,28 +311,40 @@ function check() {
   const i = level.index;
   save.stars[i] = Math.max(save.stars[i] || 0, stars); persist(); finished++;
   Sound.win();
+  Platform.gameplay(false);
   $('win-stars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-  $('win-info').textContent = 'Время: ' + Math.round(secs) + ' с';
-  $('win-next').textContent = i + 1 < LEVEL_COUNT ? 'Дальше' : 'К списку уровней';
-  setStatus('Тень совпала');
-  winTimer = setTimeout(() => $('win').classList.remove('hidden'), 1100);
+  $('win-info').textContent = t('time', { s: Math.round(secs) });
+  $('win-next').textContent = i + 1 < LEVEL_COUNT ? t('next') : t('toLevels');
+  setStatus(t('matched'));
+  const lvl = level;
+  winTimer = setTimeout(async () => {
+    if (finished % 3 === 0) await withAd(() => Platform.showInterstitial());
+    if (level === lvl && locked) $('win').classList.remove('hidden');
+  }, 1100);
 }
 
-$('win-next').onclick = async () => {
+async function withAd(fn) {
+  const wasPlaying = $('screen-game').classList.contains('active') && !locked;
+  Platform.gameplay(false); Sound.pauseAll();
+  let r = false;
+  try { r = await fn(); } catch (e) { r = false; }
+  Sound.resumeAll();
+  if (wasPlaying && !locked) Platform.gameplay(true);
+  return r;
+}
+
+$('win-next').onclick = () => {
   const i = level.index;
-  if (finished % 3 === 0) { Sound.pauseAll(); await Ads.showInterstitial(); Sound.resumeAll(); }
   if (i + 1 < LEVEL_COUNT) startLevel(i + 1); else openLevels();
 };
 $('win-retry').onclick = () => startLevel(level.index);
 
 $('btn-hint').onclick = async () => {
   if (locked || ghost) return;
-  Sound.pauseAll();
-  const ok = await Ads.showRewarded();
-  Sound.resumeAll();
-  if (!ok) { setStatus('Награда не получена'); return; }
+  const ok = await withAd(() => Platform.showRewarded());
+  if (!ok) { setStatus(t('noReward')); return; }
   hintUsed = true; ghost = true; Sound.hint();
-  setStatus('Пунктир на столе показывает нужное положение');
+  setStatus(t('hintOn'));
   draw();
 };
 
@@ -353,14 +368,40 @@ $('btn-play').onclick = () => startLevel(firstOpen());
 $('btn-levels').onclick = openLevels;
 $('levels-back').onclick = () => { applyTheme(THEMES[0]); show('screen-menu'); };
 $('game-back').onclick = () => { applyTheme(THEMES[0]); show('screen-menu'); };
-function soundLabel() { $('btn-sound').textContent = 'Звук: ' + (save.sound ? 'вкл' : 'выкл'); }
+function soundLabel() { $('btn-sound').textContent = t('sound') + ': ' + t(save.sound ? 'on' : 'off'); }
+function musicLabel() { $('btn-music').textContent = t('music') + ': ' + t(save.music ? 'on' : 'off'); }
 $('btn-sound').onclick = () => { save.sound = !save.sound; persist(); soundLabel(); Sound.setSfx(save.sound); };
-function musicLabel() { $('btn-music').textContent = 'Музыка: ' + (save.music ? 'вкл' : 'выкл'); }
 $('btn-music').onclick = () => { save.music = !save.music; persist(); musicLabel(); Sound.setMusic(save.music); };
-Sound.setSfx(save.sound); Sound.setMusic(save.music); musicLabel();
 document.addEventListener('pointerdown', () => Sound.unlock(), true);
 document.addEventListener('click', (e) => { const b = e.target.closest('.btn, .cell, .icon'); if (b && !b.closest('.controls')) Sound.ui(); }, true);
-document.addEventListener('visibilitychange', () => { if (document.hidden) Sound.pauseAll(); else Sound.resumeAll(); });
-soundLabel(); applyTheme(THEMES[0]);
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { Sound.pauseAll(); Platform.gameplay(false); return; }
+  Sound.resumeAll();
+  if ($('screen-game').classList.contains('active') && !locked) Platform.gameplay(true);
+});
+document.addEventListener('keydown', (e) => {
+  if (!$('screen-game').classList.contains('active') || locked) return;
+  const k = e.key;
+  if (k === 'ArrowLeft' || k === 'a') nudge(-1.5, 0);
+  else if (k === 'ArrowRight' || k === 'd') nudge(1.5, 0);
+  else if (k === 'ArrowUp' || k === 'w') nudge(0, -1.5);
+  else if (k === 'ArrowDown' || k === 's') nudge(0, 1.5);
+  else if ((k === 'q' || k === 'e') && level.hasRoll) { rz = Math.max(-90, Math.min(90, rz + (k === 'q' ? -1.5 : 1.5))); $('roll').value = rz; Sound.tick(); changed(); check(); }
+  else return;
+  e.preventDefault();
+});
+applyTheme(THEMES[0]);
 
-window.__sh = { Sound, startLevel, set(a, b, c) { ry = a; rx = b; rz = c || 0; changed(); check(); }, get state() { return { ry, rx, rz, match, locked, level }; } };
+async function boot() {
+  const lang = await Platform.init();
+  setLang(lang);
+  applyStatic();
+  save = await Platform.loadSave(DEFAULTS);
+  Sound.setSfx(save.sound); Sound.setMusic(save.music);
+  soundLabel(); musicLabel();
+  Platform.ready();
+}
+boot();
+
+window.__sh = { Sound, Platform, startLevel, set(a, b, c) { ry = a; rx = b; rz = c || 0; changed(); check(); }, get state() { return { ry, rx, rz, match, locked, level }; } };

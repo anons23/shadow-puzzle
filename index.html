@@ -8,19 +8,19 @@
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body oncontextmenu="return false">
 <main id="app">
   <section id="screen-menu" class="screen active">
-    <h1 class="logo">Тени</h1>
-    <p class="tag">Поверни предмет, пока тень не совпадёт.</p>
-    <button id="btn-play" class="btn big">Играть</button>
-    <button id="btn-levels" class="btn">Уровни</button>
+    <h1 class="logo" data-i18n="title">Тени</h1>
+    <p class="tag" data-i18n="tag">Поверни предмет, пока тень не совпадёт.</p>
+    <button id="btn-play" class="btn big" data-i18n="play">Играть</button>
+    <button id="btn-levels" class="btn" data-i18n="levels">Уровни</button>
     <button id="btn-sound" class="btn ghost">Звук: вкл</button>
     <button id="btn-music" class="btn ghost">Музыка: вкл</button>
   </section>
 
   <section id="screen-levels" class="screen">
-    <header class="bar"><button id="levels-back" class="icon" aria-label="Назад">&#8592;</button><span class="title">Уровни</span><span></span></header>
+    <header class="bar"><button id="levels-back" class="icon" aria-label="Назад">&#8592;</button><span class="title" data-i18n="levels">Уровни</span><span></span></header>
     <div id="level-grid" class="grid"></div>
   </section>
 
@@ -31,27 +31,28 @@
       <span class="meta" id="hud-meta">0%</span>
     </header>
     <div id="stage"><canvas id="cv"></canvas></div>
-    <div class="roll hidden" id="roll-row"><span>Наклон</span><input type="range" id="roll" min="-90" max="90" step="0.5" value="0"></div>
-    <div class="status" id="hud-status">Тяни пальцем по экрану, чтобы вращать</div>
+    <div class="roll hidden" id="roll-row"><span data-i18n="tilt">Наклон</span><input type="range" id="roll" min="-90" max="90" step="0.5" value="0"></div>
+    <div class="status" id="hud-status" data-i18n="start">Тяни пальцем по экрану, чтобы вращать</div>
     <footer class="controls">
       <button id="btn-left" class="btn small" aria-label="Влево">&#9664;</button>
       <button id="btn-up" class="btn small" aria-label="Вверх">&#9650;</button>
       <button id="btn-down" class="btn small" aria-label="Вниз">&#9660;</button>
       <button id="btn-right" class="btn small" aria-label="Вправо">&#9654;</button>
-      <button id="btn-hint" class="btn small">Подсказка</button>
+      <button id="btn-hint" class="btn small" data-i18n="hint">Подсказка</button>
     </footer>
   </section>
 
   <div id="win" class="modal hidden">
     <div class="card">
-      <h2>Тень совпала</h2>
+      <h2 data-i18n="matched">Тень совпала</h2>
       <p class="stars" id="win-stars"></p>
       <p id="win-info"></p>
       <button id="win-next" class="btn big">Дальше</button>
-      <button id="win-retry" class="btn ghost">Ещё раз</button>
+      <button id="win-retry" class="btn ghost" data-i18n="retry">Ещё раз</button>
     </div>
   </div>
 </main>
+<script src="/sdk.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

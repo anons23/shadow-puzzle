@@ -20,7 +20,7 @@ export function getLevel(index) {
   const secret = { ry: d.ry, rx: d.rx, rz: d.rz };
   const grid = rasterize(shadowPolys(model, secret.ry, secret.rx, secret.rz));
   const L = {
-    index, model, secret, grid, thr: d.thr,
+    index, model, secret, grid, thr: d.thr, keys: d.keys,
     name: d.keys.map((k) => TEMPLATES[k].name).join(' + '),
     theme: Math.floor(index / 15) % THEMES.length,
     hasRoll: index >= ROLL_FROM,
