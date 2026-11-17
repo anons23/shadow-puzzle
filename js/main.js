@@ -1,10 +1,11 @@
 import { rotateFaces, shadowPolys, rasterize, iou } from './engine.js';
-import { getLevel, LEVEL_COUNT, THEMES } from './levels.js';
+import { getLevel, LEVEL_COUNT, THEMES, METER_LEVELS, ROLL_FROM } from './levels.js';
 import { Ads } from './ads.js';
 
 const W = 360, H = 560, TABLE_Y = 150, WALL_Y = 420, S_TABLE = 50, S_WALL = 56;
 const $ = (id) => document.getElementById(id);
-const KEY = 'shadows.v1';
+const KEY = 'shadows.v2';
+const UNLOCK_ALL = /[?&]unlock=1/.test(location.search);
 let save = { stars: [], sound: true };
 try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
@@ -35,7 +36,7 @@ function resize() {
 window.addEventListener('resize', () => { resize(); draw(); });
 
 let level = null, theme = THEMES[0];
-let ry = 0, rx = 0, match = 0, ghost = false, hintUsed = false, t0 = 0, moves = 0, finished = 0, locked = false;
+let ry = 0, rx = 0, rz = 0, match = 0, ghost = false, hintUsed = false, t0 = 0, moves = 0, finished = 0, locked = false;
 
 function applyTheme(t) {
   theme = t;
@@ -48,17 +49,21 @@ function applyTheme(t) {
 function setStatus(t) { $('hud-status').textContent = t; }
 
 function recompute() {
-  match = iou(rasterize(shadowPolys(level.model, ry, rx)), level.grid);
-  $('hud-meta').textContent = Math.round(match * 100) + '%';
+  match = iou(rasterize(shadowPolys(level.model, ry, rx, rz)), level.grid);
+  $('hud-meta').textContent = level.meter ? Math.round(match * 100) + '%' : '';
 }
 
 function startLevel(i) {
   level = getLevel(i);
   applyTheme(THEMES[level.theme]);
-  ry = 0; rx = 0; ghost = false; hintUsed = false; moves = 0; locked = false; t0 = Date.now();
-  $('hud-level').textContent = 'Уровень ' + (i + 1);
+  ry = 0; rx = 0; rz = 0; ghost = false;
+  $('roll').value = 0;
+  $('roll-row').classList.toggle('hidden', !level.hasRoll); hintUsed = false; moves = 0; locked = false; t0 = Date.now();
+  $('hud-level').textContent = 'Уровень ' + (i + 1) + ' из ' + LEVEL_COUNT;
   $('win').classList.add('hidden');
-  setStatus(level.name + ': подгони тень под контур');
+  if (i === METER_LEVELS) setStatus('Дальше без процентов: подгоняй на глаз');
+  else if (i === ROLL_FROM) setStatus('Новое: ползунок наклона внизу');
+  else setStatus(level.name + ': подгони тень под контур');
   show('screen-game'); resize(); recompute(); draw();
 }
 
@@ -77,7 +82,7 @@ function buildTarget() {
   el.width = size; el.height = size;
   const c = el.getContext('2d');
   c.fillStyle = theme.line; c.strokeStyle = theme.line; c.lineWidth = 1; c.lineJoin = 'round';
-  shadowPolys(level.model, level.secret.ry, level.secret.rx).forEach((poly) => {
+  shadowPolys(level.model, level.secret.ry, level.secret.rx, level.secret.rz).forEach((poly) => {
     c.beginPath();
     poly.forEach((p, i) => { const x = (p[0] + 2.2) * S_WALL * k, y = (2.2 - p[1]) * S_WALL * k; if (i) c.lineTo(x, y); else c.moveTo(x, y); });
     c.closePath(); c.fill(); c.stroke();
@@ -100,17 +105,17 @@ function draw() {
   ctx.drawImage(level.tcv.el, W / 2 - 2.2 * S_WALL, WALL_Y - 2.2 * S_WALL, 4.4 * S_WALL, 4.4 * S_WALL);
   ctx.globalAlpha = 1;
 
-  const cur = shadowPolys(level.model, ry, rx);
+  const cur = shadowPolys(level.model, ry, rx, rz);
   ctx.fillStyle = theme.shadow; ctx.globalAlpha = 0.88;
   cur.forEach((poly) => { path(poly.map((p) => wallXY([p[0], p[1]]))); ctx.fill(); });
   ctx.globalAlpha = 1;
 
   if (ghost) {
     ctx.setLineDash([4, 5]); ctx.lineWidth = 1.5; ctx.strokeStyle = theme.line;
-    rotateFaces(level.model, level.secret.ry, level.secret.rx).forEach((f) => { path(f.map(tableXY)); ctx.stroke(); });
+    rotateFaces(level.model, level.secret.ry, level.secret.rx, level.secret.rz).forEach((f) => { path(f.map(tableXY)); ctx.stroke(); });
     ctx.setLineDash([]);
   }
-  const faces = rotateFaces(level.model, ry, rx);
+  const faces = rotateFaces(level.model, ry, rx, rz);
   const order = faces.map((f, i) => [f.reduce((s, p) => s + p[2], 0) / f.length, i]).sort((a, b) => b[0] - a[0]);
   ctx.lineWidth = 1.2;
   order.forEach(([, i]) => {
@@ -124,8 +129,10 @@ function draw() {
     ctx.globalAlpha = 0.5 + 0.5 * lit; ctx.fillStyle = theme.obj; ctx.fill();
     ctx.globalAlpha = 0.35; ctx.strokeStyle = theme.bg; ctx.stroke(); ctx.globalAlpha = 1;
   });
-  ctx.fillStyle = theme.fg; ctx.globalAlpha = 0.9; ctx.font = '500 15px sans-serif';
-  ctx.fillText(Math.round(match * 100) + '%', W - 52, 308); ctx.globalAlpha = 1;
+  if (level.meter) {
+    ctx.fillStyle = theme.fg; ctx.globalAlpha = 0.9; ctx.font = '500 15px sans-serif';
+    ctx.fillText(Math.round(match * 100) + '%', W - 52, 308); ctx.globalAlpha = 1;
+  }
 }
 
 function clamp() { ry = Math.max(-120, Math.min(120, ry)); rx = Math.max(-100, Math.min(100, rx)); }
@@ -148,13 +155,16 @@ $('btn-left').onclick = () => nudge(-1.5, 0);
 $('btn-right').onclick = () => nudge(1.5, 0);
 $('btn-up').onclick = () => nudge(0, -1.5);
 $('btn-down').onclick = () => nudge(0, 1.5);
+$('roll').addEventListener('input', (e) => { if (locked) return; rz = +e.target.value; moves++; changed(); });
+$('roll').addEventListener('change', () => check());
 
 function check() {
   if (locked || match < level.thr) return;
   locked = true;
-  ry = level.secret.ry; rx = level.secret.rx; recompute(); draw();
+  ry = level.secret.ry; rx = level.secret.rx; rz = level.secret.rz; $('roll').value = rz; recompute(); draw();
   const secs = (Date.now() - t0) / 1000;
-  const stars = hintUsed ? 1 : secs < 45 ? 3 : 2;
+  const fast = level.index < 20 ? 45 : level.index < 40 ? 75 : 100;
+  const stars = hintUsed ? 1 : secs < fast ? 3 : 2;
   const i = level.index;
   save.stars[i] = Math.max(save.stars[i] || 0, stars); persist(); finished++;
   [523, 659, 784].forEach((f, k) => setTimeout(() => tone(f, 0.25, 'sine', 0.1), k * 130));
@@ -185,7 +195,7 @@ function openLevels() {
   const grid = $('level-grid');
   grid.innerHTML = '';
   for (let i = 0; i < LEVEL_COUNT; i++) {
-    const open = i === 0 || save.stars[i - 1] > 0;
+    const open = UNLOCK_ALL || i === 0 || save.stars[i - 1] > 0;
     const b = document.createElement('button');
     b.className = 'cell' + (open ? '' : ' locked');
     const s = save.stars[i] || 0;
@@ -205,4 +215,4 @@ function soundLabel() { $('btn-sound').textContent = 'Звук: ' + (save.sound 
 $('btn-sound').onclick = () => { save.sound = !save.sound; persist(); soundLabel(); tone(440, 0.1); };
 soundLabel(); applyTheme(THEMES[1]);
 
-window.__sh = { startLevel, set(a, b) { ry = a; rx = b; changed(); check(); }, get state() { return { ry, rx, match, locked, level }; } };
+window.__sh = { startLevel, set(a, b, c) { ry = a; rx = b; rz = c || 0; changed(); check(); }, get state() { return { ry, rx, rz, match, locked, level }; } };

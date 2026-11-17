@@ -64,6 +64,16 @@ export const TEMPLATES = {
   lamp: { sym: true, name: 'Лампа', build: () => [...prism(0, -0.9, 0, 0.55, 0.15, 10), ...prism(0, -0.2, 0, 0.07, 1.4, 6), ...prism(0, 0.7, 0, 0.6, 0.5, 10)] },
   rocket: { sym: true, name: 'Ракета', build: () => [...prism(0, 0, 0, 0.45, 1.6, 10), ...cone(0, 0.8, 0, 0.45, 0.8, 10), ...box(-0.6, -0.7, 0, 0.5, 0.6, 0.1), ...box(0.6, -0.7, 0, 0.5, 0.6, 0.1), ...box(0, -0.7, -0.6, 0.1, 0.6, 0.5), ...box(0, -0.7, 0.6, 0.1, 0.6, 0.5)] },
   arch: { name: 'Арка', build: () => [...box(-0.8, -0.2, 0, 0.4, 1.6, 0.5), ...box(0.8, -0.2, 0, 0.4, 1.6, 0.5), ...box(0, 0.75, 0, 2, 0.35, 0.5), ...box(0, 1.15, 0, 0.5, 0.45, 0.3)] },
+  ladder: { name: 'Лестница', build: () => {
+    const f = [...box(-0.55, 0, 0, 0.12, 2, 0.12), ...box(0.55, 0, 0, 0.12, 2, 0.12)];
+    for (const y of [-0.8, -0.4, 0, 0.4, 0.8]) f.push(...box(0, y, 0, 1.1, 0.1, 0.1));
+    return f;
+  } },
+  windmill: { name: 'Мельница', build: () => [...box(0, -0.4, 0, 0.6, 1.4, 0.6), ...cone(0, 0.3, 0, 0.45, 0.5, 4), ...box(0, 0.5, 0.45, 1.9, 0.12, 0.06), ...box(0, 0.5, 0.45, 0.12, 1.9, 0.06)] },
+  bench: { name: 'Скамейка', build: () => [...box(0, -0.1, 0, 1.8, 0.12, 0.6), ...box(0, 0.4, -0.25, 1.8, 0.6, 0.1), ...box(-0.8, -0.55, 0, 0.12, 0.9, 0.5), ...box(0.8, -0.55, 0, 0.12, 0.9, 0.5)] },
+  castle: { name: 'Замок', build: () => [...box(0, -0.5, 0, 1.8, 0.9, 0.9), ...box(-0.8, 0.1, 0, 0.4, 1.9, 0.4), ...box(0.8, 0.1, 0, 0.4, 1.9, 0.4), ...cone(-0.8, 1.05, 0, 0.35, 0.6, 6), ...cone(0.8, 1.05, 0, 0.35, 0.6, 6)] },
+  cactus: { name: 'Кактус', sym: true, build: () => [...prism(0, 0, 0, 0.28, 2, 8), ...box(-0.5, 0.15, 0, 0.6, 0.18, 0.18), ...box(-0.75, 0.5, 0, 0.18, 0.7, 0.18), ...box(0.5, -0.15, 0, 0.6, 0.18, 0.18), ...box(0.75, 0.2, 0, 0.18, 0.7, 0.18)] },
+  letterE: { name: 'Буква Е', build: () => [...box(-0.6, 0, 0, 0.35, 2, 0.35), ...box(0, 0.8, 0, 1.2, 0.35, 0.35), ...box(0, 0, 0, 1.0, 0.3, 0.35), ...box(0, -0.8, 0, 1.2, 0.35, 0.35)] },
 };
 
 function bounds(faces) {
@@ -83,26 +93,26 @@ export function normalize(faces, radius) {
 
 export function buildModel(keys) {
   if (keys.length === 1) return normalize(TEMPLATES[keys[0]].build(), R0);
-  const offs = [-0.95, 0.95];
+  const cfg = keys.length === 2 ? { r: 1.0, offs: [-0.95, 0.95] } : { r: 0.75, offs: [-1.3, 0, 1.3] };
   const out = [];
   keys.forEach((k, i) => {
-    const part = normalize(TEMPLATES[k].build(), 1.0);
-    part.forEach((f) => out.push(f.map((p) => [p[0] + offs[i], p[1], p[2]])));
+    normalize(TEMPLATES[k].build(), cfg.r).forEach((f) => out.push(f.map((p) => [p[0] + cfg.offs[i], p[1], p[2]])));
   });
   return out;
 }
 
-export function rotateFaces(faces, ryDeg, rxDeg) {
-  const a = (ryDeg * Math.PI) / 180, b = (rxDeg * Math.PI) / 180;
-  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+export function rotateFaces(faces, ryDeg, rxDeg, rzDeg) {
+  const a = (ryDeg * Math.PI) / 180, b = (rxDeg * Math.PI) / 180, c = ((rzDeg || 0) * Math.PI) / 180;
+  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b), cc = Math.cos(c), sc = Math.sin(c);
   return faces.map((f) => f.map((p) => {
     const x1 = p[0] * ca + p[2] * sa, z1 = -p[0] * sa + p[2] * ca;
-    return [x1, p[1] * cb - z1 * sb, p[1] * sb + z1 * cb];
+    const y2 = p[1] * cb - z1 * sb, z2 = p[1] * sb + z1 * cb;
+    return [x1 * cc - y2 * sc, x1 * sc + y2 * cc, z2];
   }));
 }
 
-export function shadowPolys(faces, ryDeg, rxDeg) {
-  return rotateFaces(faces, ryDeg, rxDeg).map((f) => f.map((p) => [p[0], p[1]]));
+export function shadowPolys(faces, ryDeg, rxDeg, rzDeg) {
+  return rotateFaces(faces, ryDeg, rxDeg, rzDeg).map((f) => f.map((p) => [p[0], p[1]]));
 }
 
 export function rasterize(polys) {
@@ -138,6 +148,6 @@ export function areaFraction(g) {
   return s / g.length;
 }
 
-export function matchAt(model, targetGrid, ry, rx) {
-  return iou(rasterize(shadowPolys(model, ry, rx)), targetGrid);
+export function matchAt(model, targetGrid, ry, rx, rz) {
+  return iou(rasterize(shadowPolys(model, ry, rx, rz)), targetGrid);
 }
