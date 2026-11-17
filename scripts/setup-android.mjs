@@ -38,6 +38,11 @@ writeFileSync(styles, st);
 const gradle = `${APP}/build.gradle`;
 let g = readFileSync(gradle, 'utf8');
 if (!g.includes('com.yandex.android:mobileads')) g = g.replace(/dependencies\s*\{/, (m) => `${m}\n    implementation '${YANDEX_ADS}'`);
+// The Yandex SDK ships a lint check that fails release builds when a newer major
+// (8.x) exists. 7.x works with our plugin, so only that check is switched off.
+if (!g.includes('MobileAdsSdkOutdatedVersion')) {
+  g = g.replace(/\nandroid\s*\{/, (m) => `${m}\n    lint {\n        disable 'MobileAdsSdkOutdatedVersion'\n    }`);
+}
 if (!g.includes('// game-signing')) {
   g = g.replace(/buildTypes\s*\{\s*release\s*\{/, (m) => `${m}\n            signingConfig signingConfigs.release`);
   g = g.replace(/(\n\s*)buildTypes\s*\{/, `$1// game-signing
