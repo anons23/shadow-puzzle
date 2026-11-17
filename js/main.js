@@ -1,6 +1,7 @@
 import { rotateFaces, shadowPolys, rasterize, iou } from './engine.js';
 import { getLevel, LEVEL_COUNT, THEMES, METER_LEVELS, ROLL_FROM } from './levels.js';
 import { Ads } from './ads.js';
+import { Sound } from './audio.js';
 
 const W = 360, H = 560, WALL_H = 330;
 const SX = 180, SY = 182, S_WALL = 50;
@@ -11,24 +12,16 @@ const KEY = 'shadows.v2';
 // TODO перед релизом: поставить TEST_UNLOCK_ALL = false
 const TEST_UNLOCK_ALL = true;
 const UNLOCK_ALL = TEST_UNLOCK_ALL || /[?&]unlock=1/.test(location.search);
-let save = { stars: [], sound: true };
+let save = { stars: [], sound: true, music: true };
 try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
 
-let actx = null;
-function tone(freq, dur, type, vol) {
-  if (!save.sound) return;
-  try {
-    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-    const o = actx.createOscillator(), g = actx.createGain();
-    o.type = type || 'sine'; o.frequency.value = freq; g.gain.value = vol || 0.08;
-    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
-    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + dur);
-  } catch (e) {}
-}
 function buzz(ms) { try { if (save.sound && navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
 
-function show(id) { document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id)); }
+function show(id) {
+  document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+  Sound.setScene(id === 'screen-game');
+}
 
 function hex(c) { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function mix(a, b, t) { const A = hex(a), B = hex(b); return 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',') + ')'; }
@@ -93,6 +86,7 @@ function startLevel(i) {
   level = getLevel(i);
   level.tcv = null;
   applyTheme(THEMES[level.theme]);
+  Sound.setRoom(level.theme);
   ry = 0; rx = 0; rz = 0; ghost = false; hintUsed = false; moves = 0; locked = false; t0 = Date.now(); winAt = 0; sparks = [];
   $('roll').value = 0;
   $('roll-row').classList.toggle('hidden', !level.hasRoll);
@@ -271,23 +265,31 @@ function clamp() { ry = Math.max(-120, Math.min(120, ry)); rx = Math.max(-100, M
 function changed() { clamp(); recompute(); draw(); }
 
 let drag = null;
-cv.addEventListener('pointerdown', (e) => { if (locked) return; drag = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointerdown', (e) => { if (locked) return; drag = { x: e.clientX, y: e.clientY, t: performance.now() }; cv.setPointerCapture(e.pointerId); });
 cv.addEventListener('pointermove', (e) => {
   if (!drag || locked) return;
   const k = 0.55 / scale;
   ry += (e.clientX - drag.x) * k; rx += (e.clientY - drag.y) * k;
-  drag.x = e.clientX; drag.y = e.clientY; moves++; changed();
+  const nt = performance.now(), dist = Math.hypot(e.clientX - drag.x, e.clientY - drag.y) / scale;
+  Sound.drag(dist / Math.max(8, nt - drag.t));
+  drag.x = e.clientX; drag.y = e.clientY; drag.t = nt; moves++; changed();
 });
-function release() { if (!drag) return; drag = null; check(); }
+function release() { if (!drag) return; drag = null; Sound.dragEnd(); check(); }
 cv.addEventListener('pointerup', release);
 cv.addEventListener('pointercancel', release);
 
-function nudge(dy, dx) { if (locked) return; ry += dy; rx += dx; moves++; tone(900, 0.03, 'triangle', 0.02); changed(); check(); }
+function nudge(dy, dx) { if (locked) return; ry += dy; rx += dx; moves++; Sound.click(); changed(); check(); }
 $('btn-left').onclick = () => nudge(-1.5, 0);
 $('btn-right').onclick = () => nudge(1.5, 0);
 $('btn-up').onclick = () => nudge(0, -1.5);
 $('btn-down').onclick = () => nudge(0, 1.5);
-$('roll').addEventListener('input', (e) => { if (locked) return; rz = +e.target.value; moves++; changed(); });
+let lastTick = 0;
+$('roll').addEventListener('input', (e) => {
+  if (locked) return;
+  rz = +e.target.value; moves++;
+  if (Math.abs(rz - lastTick) >= 5) { lastTick = Math.round(rz / 5) * 5; Sound.tick(); }
+  changed();
+});
 $('roll').addEventListener('change', () => check());
 
 function check() {
@@ -305,7 +307,7 @@ function check() {
   const stars = hintUsed ? 1 : secs < fast ? 3 : 2;
   const i = level.index;
   save.stars[i] = Math.max(save.stars[i] || 0, stars); persist(); finished++;
-  [523, 659, 784, 1046].forEach((f, k) => setTimeout(() => tone(f, 0.3, 'sine', 0.09), k * 120));
+  Sound.win();
   $('win-stars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
   $('win-info').textContent = 'Время: ' + Math.round(secs) + ' с';
   $('win-next').textContent = i + 1 < LEVEL_COUNT ? 'Дальше' : 'К списку уровней';
@@ -315,16 +317,18 @@ function check() {
 
 $('win-next').onclick = async () => {
   const i = level.index;
-  if (finished % 3 === 0) await Ads.showInterstitial();
+  if (finished % 3 === 0) { Sound.pauseAll(); await Ads.showInterstitial(); Sound.resumeAll(); }
   if (i + 1 < LEVEL_COUNT) startLevel(i + 1); else openLevels();
 };
 $('win-retry').onclick = () => startLevel(level.index);
 
 $('btn-hint').onclick = async () => {
   if (locked || ghost) return;
+  Sound.pauseAll();
   const ok = await Ads.showRewarded();
+  Sound.resumeAll();
   if (!ok) { setStatus('Награда не получена'); return; }
-  hintUsed = true; ghost = true;
+  hintUsed = true; ghost = true; Sound.hint();
   setStatus('Пунктир на столе показывает нужное положение');
   draw();
 };
@@ -350,7 +354,13 @@ $('btn-levels').onclick = openLevels;
 $('levels-back').onclick = () => { applyTheme(THEMES[0]); show('screen-menu'); };
 $('game-back').onclick = () => { applyTheme(THEMES[0]); show('screen-menu'); };
 function soundLabel() { $('btn-sound').textContent = 'Звук: ' + (save.sound ? 'вкл' : 'выкл'); }
-$('btn-sound').onclick = () => { save.sound = !save.sound; persist(); soundLabel(); tone(440, 0.1); };
+$('btn-sound').onclick = () => { save.sound = !save.sound; persist(); soundLabel(); Sound.setSfx(save.sound); };
+function musicLabel() { $('btn-music').textContent = 'Музыка: ' + (save.music ? 'вкл' : 'выкл'); }
+$('btn-music').onclick = () => { save.music = !save.music; persist(); musicLabel(); Sound.setMusic(save.music); };
+Sound.setSfx(save.sound); Sound.setMusic(save.music); musicLabel();
+document.addEventListener('pointerdown', () => Sound.unlock(), true);
+document.addEventListener('click', (e) => { const b = e.target.closest('.btn, .cell, .icon'); if (b && !b.closest('.controls')) Sound.ui(); }, true);
+document.addEventListener('visibilitychange', () => { if (document.hidden) Sound.pauseAll(); else Sound.resumeAll(); });
 soundLabel(); applyTheme(THEMES[0]);
 
-window.__sh = { startLevel, set(a, b, c) { ry = a; rx = b; rz = c || 0; changed(); check(); }, get state() { return { ry, rx, rz, match, locked, level }; } };
+window.__sh = { Sound, startLevel, set(a, b, c) { ry = a; rx = b; rz = c || 0; changed(); check(); }, get state() { return { ry, rx, rz, match, locked, level }; } };
