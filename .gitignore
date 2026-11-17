@@ -5,3 +5,4 @@ android/
 *.keystore
 local.properties
 dist/
+tools/video/out/

@@ -37,6 +37,12 @@
 
 Пересоздать: `python3 tools/promo/render_rustore.py` (нужны Playwright, Chrome и Pillow).
 
+Видео в `store/rustore/video/` (27 с, 1080p, со звуком):
+- `shadows-16x9.mp4` — горизонтальное, для VK Видео → поле «Видео» в RuStore, подходит и как фоновое
+- `shadows-9x16.mp4` — вертикальное, публикуется в VK как клип
+
+Пересоздать: `python3 tools/video/capture.py && python3 tools/video/render_art.py && python3 tools/video/compose.py` (нужны Playwright, Chrome, Pillow, numpy, ffmpeg).
+
 ## Перед релизом
 - В `js/main.js` поставить `TEST_UNLOCK_ALL = false` (сейчас для теста открыты все уровни).
 

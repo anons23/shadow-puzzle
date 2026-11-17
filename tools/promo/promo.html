@@ -12,7 +12,7 @@ const house = buildModel(['house']);
 const HOUSE = { ry: -45.75, rx: -28.03, rz: 0 };
 const OFF = { ry: -38, rx: -21, rz: 0 };
 const c = document.getElementById('c'), ctx = c.getContext('2d');
-const size = { icon: [512, 512], cover: [800, 470], showcase: [1560, 520], banner: [1920, 1080] }[kind];
+const size = { icon: [512, 512], cover: [800, 470], showcase: [1560, 520], banner: [1920, 1080], vertical: [1080, 1920] }[kind];
 c.width = size[0]; c.height = size[1];
 const [W, H] = size;
 if (kind === 'icon') {
@@ -35,6 +35,12 @@ if (kind === 'banner') {
     wall: { x: 1290, y: 360, s: 128 }, lightR: 760, tableY: 700, obj: { x: 1330, y: 905, s: 70 },
     candle: { x: 1010, y: 1010, k: 2.3 }, vx: 0.66, vignette: 0.66, dust: 80, seed: 11 });
   drawTitle(ctx, { title: TXT.title, tag: TXT.tag, x: 190, y: 520, size: lang === 'ru' ? 230 : 180 });
+}
+if (kind === 'vertical') {
+  drawScene(ctx, W, H, { theme: THEMES[0], model: house, rot: HOUSE, target: HOUSE, outline: true, glow: 0.45,
+    wall: { x: 560, y: 820, s: 150 }, lightR: 760, tableY: 1260, obj: { x: 610, y: 1560, s: 78 },
+    candle: { x: 270, y: 1700, k: 2.6 }, vx: 0.5, vignette: 0.6, dust: 90, seed: 13 });
+  drawTitle(ctx, { title: TXT.title, tag: TXT.tag, x: 150, y: 470, size: lang === 'ru' ? 200 : 160 });
 }
 window.__done = c.toDataURL('image/png');
 </script></body></html>
