@@ -1,0 +1,6 @@
+{
+  "appId": "ru.anons23.shadows",
+  "appName": "Тени",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

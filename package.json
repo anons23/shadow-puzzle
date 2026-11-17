@@ -1,0 +1,17 @@
+{
+  "name": "shadow-puzzle",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node tools/check-levels.mjs",
+    "serve": "python3 -m http.server 8080",
+    "prepare-web": "node scripts/prepare-web.mjs",
+    "sync": "npm run prepare-web && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0"
+  }
+}
