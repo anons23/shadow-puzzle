@@ -6,10 +6,10 @@ export const METER_LEVELS = 7;
 export const ROLL_FROM = 14;
 
 export const THEMES = [
-  { name: 'Бумага', bg: '#f4efe3', fg: '#2b2a26', soft: '#e3dccb', wallbg: '#fbf8ef', shadow: '#2b2a26', line: '#d9482b', obj: '#1f6f8b' },
-  { name: 'Ночь', bg: '#12141f', fg: '#e8ecff', soft: '#1d2133', wallbg: '#262c47', shadow: '#05060c', line: '#5eead4', obj: '#fbbf24' },
-  { name: 'Неон', bg: '#0b0b10', fg: '#f5f5ff', soft: '#171722', wallbg: '#231a33', shadow: '#000000', line: '#ff2d95', obj: '#00e5ff' },
-  { name: 'Лёд', bg: '#e8f3fb', fg: '#14304a', soft: '#d3e6f3', wallbg: '#f6fbff', shadow: '#1b3a57', line: '#1d4ed8', obj: '#0ea5a4' },
+  { name: 'Чердак', bg: '#17110c', fg: '#f3e6d0', soft: '#2a1f16', line: '#ffc46b', obj: '#c98a4b', wall: '#4a3a2c', wallLit: '#d9b98c', table: '#3e2816', tableLit: '#8a5e38', shadow: '#120a05', glow: '#ffb347' },
+  { name: 'Детская', bg: '#0f1424', fg: '#e6ecff', soft: '#1b2238', line: '#8fd3ff', obj: '#e7a5c4', wall: '#26304d', wallLit: '#8ea6d8', table: '#2a2440', tableLit: '#5d527d', shadow: '#05070f', glow: '#ffd59a' },
+  { name: 'Театр', bg: '#160809', fg: '#ffe9e0', soft: '#2a1214', line: '#ffd36b', obj: '#d9d2c5', wall: '#5a1418', wallLit: '#e0866e', table: '#24150f', tableLit: '#5a3a28', shadow: '#0a0203', glow: '#ff9a5a' },
+  { name: 'Мастерская', bg: '#121513', fg: '#e9f0e6', soft: '#1f2621', line: '#b6f08f', obj: '#b8c2c9', wall: '#3c4640', wallLit: '#c6d1b8', table: '#33281c', tableLit: '#7a6045', shadow: '#070908', glow: '#ffe2a0' },
 ];
 
 const cache = new Map();
@@ -22,7 +22,7 @@ export function getLevel(index) {
   const L = {
     index, model, secret, grid, thr: d.thr,
     name: d.keys.map((k) => TEMPLATES[k].name).join(' + '),
-    theme: Math.floor(index / 5) % THEMES.length,
+    theme: Math.floor(index / 15) % THEMES.length,
     hasRoll: index >= ROLL_FROM,
     meter: index < METER_LEVELS,
   };
