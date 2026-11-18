@@ -476,6 +476,8 @@ async function boot() {
     document.body.appendChild(el);
   }
   Platform.ready();
+  // CrazyGames: a new player lands straight in level 1 instead of the menu.
+  if (Platform.directStart && !save.stars.some((x) => x > 0)) startLevel(0);
 }
 boot();
 

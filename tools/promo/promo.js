@@ -115,11 +115,13 @@ export function drawScene(ctx, W, H, o) {
 export function drawTitle(ctx, o) {
   ctx.save();
   ctx.textBaseline = 'alphabetic';
+  if (o.center) ctx.textAlign = 'center';
   ctx.shadowColor = 'rgba(0,0,0,0.65)'; ctx.shadowBlur = o.size * 0.25; ctx.shadowOffsetY = o.size * 0.04;
   ctx.font = '700 ' + o.size + 'px "DejaVu Serif", serif';
   const g = ctx.createLinearGradient(0, o.y - o.size, 0, o.y);
   g.addColorStop(0, '#fff3d6'); g.addColorStop(1, '#ffc46b');
   ctx.fillStyle = g; ctx.fillText(o.title, o.x, o.y);
+  if (!o.tag) { ctx.restore(); return; }
   ctx.shadowBlur = o.size * 0.12;
   ctx.font = '500 ' + Math.round(o.size * 0.24) + 'px Inter, sans-serif';
   ctx.fillStyle = 'rgba(255,240,215,0.92)';
