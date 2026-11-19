@@ -3,7 +3,10 @@ import asyncio, json, os, shutil, subprocess, sys, time
 from playwright.async_api import async_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT = os.path.join(ROOT, 'tools', 'video', 'out')
+OUT = os.environ.get('VIDEO_OUT', os.path.join(ROOT, 'tools', 'video', 'out'))
+# VIEW=w,h,dpr,mobile (default 540,960,2,1); LOCALE (default ru-RU); SCENE_IDS=0,1,2 to pick scenes
+VIEW = [float(x) for x in os.environ.get('VIEW', '540,960,2,1').split(',')]
+LOCALE = os.environ.get('LOCALE', 'ru-RU')
 FR = os.path.join(OUT, 'frames')
 CHROME = os.environ.get('CHROME', '/usr/bin/google-chrome')
 PORT = 8792
@@ -55,7 +58,7 @@ async def main():
     try:
         async with async_playwright() as p:
             b = await p.chromium.launch(executable_path=CHROME, args=['--no-sandbox'])
-            ctx = await b.new_context(viewport={'width': 540, 'height': 960}, device_scale_factor=2, is_mobile=True, has_touch=True, locale='ru-RU')
+            ctx = await b.new_context(viewport={'width': int(VIEW[0]), 'height': int(VIEW[1])}, device_scale_factor=VIEW[2], is_mobile=bool(VIEW[3]), has_touch=bool(VIEW[3]), locale=LOCALE)
             await ctx.add_init_script(CLOCK)
             pg = await ctx.new_page()
             errs = []
@@ -67,7 +70,8 @@ async def main():
             box = await pg.locator('#cv').bounding_box()
             cx, cy = box['x'] + box['width'] * 0.55, box['y'] + box['height'] * 0.72
             n = 0
-            for sc in SCENES:
+            ids = os.environ.get('SCENE_IDS')
+            for sc in ([SCENES[int(i)] for i in ids.split(',')] if ids else SCENES):
                 await pg.evaluate(f"__sh.startLevel({sc['level']})")
                 sec = await pg.evaluate('(()=>{const s=__sh.state.level.secret;return [s.ry,s.rx,s.rz,__sh.state.level.hasRoll]})()')
                 roll = sec[3]; target = [sec[0], sec[1], sec[2] if roll else 0]
